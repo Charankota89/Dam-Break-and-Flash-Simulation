@@ -5,13 +5,11 @@ frontend:
       commands:
         - cd frontend
         - npm install
+        - chmod +x node_modules/.bin/* || true
     build:
       commands:
-        - npm run build
+        - npx vite build
   artifacts:
     baseDirectory: frontend/dist
     files:
       - '**/*'
-  cache:
-    paths:
-      - frontend/node_modules/**/*
