@@ -32,10 +32,10 @@ const MAP_SOURCES = {
   }
 };
 
-function Header({ activeTab, setActiveTab, onOpenReport, isRunning }) {
+function Header({ activeTab, setActiveTab, onOpenReport, onStartSimulation, isRunning }) {
   return (
-    <header className="w-full bg-slate-900 text-white sticky top-0 z-50 shadow-lg border-b border-emerald-800">
-      <div className="bg-emerald-800 px-4 py-1.5 flex items-center justify-between text-xs font-semibold text-emerald-100">
+    <header className="app-header">
+      <div className="top-bar">
         <div className="flex items-center gap-2 overflow-hidden">
           <span className="bg-white text-emerald-950 font-black px-2 py-0.5 rounded text-[10px] uppercase tracking-wide">
             LIVE MONITOR
@@ -48,71 +48,61 @@ function Header({ activeTab, setActiveTab, onOpenReport, isRunning }) {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-        <div onClick={() => setActiveTab('home')} className="flex items-center gap-3 cursor-pointer group">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 group-hover:bg-emerald-500 transition-colors flex items-center justify-center shadow-md">
+      <div className="header-container">
+        <div onClick={() => setActiveTab('home')} className="brand-wrapper">
+          <div className="brand-logo">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div>
-            <span className="font-black text-xl tracking-tight text-white group-hover:text-emerald-400 transition-colors">
+            <span className="brand-title">
               DAM FLOOD SHIELD
             </span>
-            <p className="text-xs text-slate-300 font-medium">Simple Dam Break & Flood Water Simulator</p>
+            <p className="brand-subtitle">Simple Dam Break & Flood Water Simulator</p>
           </div>
         </div>
 
-        <nav className="flex items-center gap-1 bg-slate-800 p-1 rounded-xl border border-slate-700">
+        <nav className="nav-menu">
           <button
             onClick={() => setActiveTab('home')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'home' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`nav-link ${activeTab === 'home' ? 'nav-link-active' : ''}`}
           >
             <Home className="w-4 h-4" />
             <span>Home</span>
           </button>
           <button
             onClick={() => setActiveTab('studio')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'studio' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`nav-link ${activeTab === 'studio' ? 'nav-link-active' : ''}`}
           >
             <Layers className="w-4 h-4" />
             <span>Run Simulation</span>
           </button>
           <button
             onClick={() => setActiveTab('satellite')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'satellite' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`nav-link ${activeTab === 'satellite' ? 'nav-link-active' : ''}`}
           >
             <CheckCircle2 className="w-4 h-4" />
             <span>Satellite Check</span>
           </button>
           <button
             onClick={() => setActiveTab('hadr')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all ${
-              activeTab === 'hadr' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-300 hover:text-white hover:bg-slate-700'
-            }`}
+            className={`nav-link ${activeTab === 'hadr' ? 'nav-link-active' : ''}`}
           >
             <AlertTriangle className="w-4 h-4" />
             <span>Village Safety</span>
           </button>
         </nav>
 
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onOpenReport}
-            className="flex items-center gap-2 px-3.5 py-2 text-xs font-bold text-white bg-slate-800 hover:bg-slate-700 rounded-lg border border-slate-600 transition-colors"
-          >
+        <div className="header-actions">
+          <button onClick={onOpenReport} className="btn-secondary">
             <FileText className="w-3.5 h-3.5" />
             <span>Get Report</span>
           </button>
           <button
-            onClick={() => setActiveTab('studio')}
-            className={`flex items-center gap-2 px-4 py-2 text-xs font-bold rounded-lg shadow-md transition-all ${
-              isRunning ? 'bg-amber-500 text-slate-950 animate-pulse' : 'bg-emerald-600 hover:bg-emerald-500 text-white'
-            }`}
+            onClick={() => {
+              setActiveTab('studio');
+              if (onStartSimulation && !isRunning) onStartSimulation();
+            }}
+            className={`btn-accent ${isRunning ? 'btn-accent-running' : ''}`}
           >
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>{isRunning ? 'Calculating...' : 'Start Simulation'}</span>
@@ -129,8 +119,8 @@ function MapView({ site, run, timelineStep, currentMapStyle, setCurrentMapStyle 
 
   useEffect(() => {
     if (!mapContainer.current) return;
-    const lat = site ? site.lat : 30.55;
-    const lng = site ? site.lng : 79.78;
+    const lat = site ? site.latitude || site.lat : 30.535;
+    const lng = site ? site.longitude || site.lng : 79.732;
 
     const map = new maplibregl.Map({
       container: mapContainer.current,
@@ -177,12 +167,24 @@ function MapView({ site, run, timelineStep, currentMapStyle, setCurrentMapStyle 
 
     const updateLayers = () => {
       if (!map.isStyleLoaded()) return;
-      if (map.getLayer('flood-layer-fill')) map.removeLayer('flood-layer-fill');
-      if (map.getLayer('flood-layer-line')) map.removeLayer('flood-layer-line');
-      if (map.getSource('flood-extent')) map.removeSource('flood-extent');
 
+      const activeFrame = (run.timelineFrames && run.timelineFrames[timelineStep])
+        ? run.timelineFrames[timelineStep]
+        : null;
+
+      const rawGeoJson = activeFrame ? activeFrame.geoJson : run.floodExtentGeoJson;
+      if (!rawGeoJson) return;
+
+      let geojson;
       try {
-        const geojson = JSON.parse(run.floodExtentGeoJson);
+        geojson = typeof rawGeoJson === 'string' ? JSON.parse(rawGeoJson) : rawGeoJson;
+      } catch (err) {
+        return;
+      }
+
+      if (map.getSource('flood-extent')) {
+        map.getSource('flood-extent').setData(geojson);
+      } else {
         map.addSource('flood-extent', { type: 'geojson', data: geojson });
         map.addLayer({
           id: 'flood-layer-fill',
@@ -205,7 +207,7 @@ function MapView({ site, run, timelineStep, currentMapStyle, setCurrentMapStyle 
           source: 'flood-extent',
           paint: { 'line-color': '#0284c7', 'line-width': 2 }
         });
-      } catch (err) {}
+      }
     };
 
     if (map.isStyleLoaded()) {
@@ -216,9 +218,9 @@ function MapView({ site, run, timelineStep, currentMapStyle, setCurrentMapStyle 
   }, [run, timelineStep]);
 
   return (
-    <div className="relative w-full h-[520px] rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-slate-900">
-      <div ref={mapContainer} className="w-full h-full" />
-      <div className="absolute top-4 left-4 z-10 bg-white/95 backdrop-blur-md p-1.5 rounded-xl border border-slate-200 shadow-md flex items-center gap-1">
+    <div className="map-container-box">
+      <div ref={mapContainer} className="map-element" />
+      <div className="map-layer-bar">
         <div className="flex items-center gap-1.5 px-2.5 py-1 text-slate-700 text-xs font-bold uppercase border-r border-slate-200 mr-1">
           <Globe className="w-3.5 h-3.5 text-emerald-600" />
           <span>Map Layer</span>
@@ -227,16 +229,14 @@ function MapView({ site, run, timelineStep, currentMapStyle, setCurrentMapStyle 
           <button
             key={styleKey}
             onClick={() => setCurrentMapStyle(styleKey)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              currentMapStyle === styleKey ? 'bg-emerald-600 text-white font-bold shadow-sm' : 'text-slate-700 hover:bg-slate-100'
-            }`}
+            className={`map-layer-btn ${currentMapStyle === styleKey ? 'map-layer-btn-active' : ''}`}
           >
             {MAP_SOURCES[styleKey].name}
           </button>
         ))}
       </div>
 
-      <div className="absolute bottom-4 right-4 z-10 bg-white/95 backdrop-blur-md p-3 rounded-xl border border-slate-200 shadow-md text-xs text-slate-800">
+      <div className="map-legend-box">
         <div className="flex items-center gap-1.5 font-bold mb-2 text-slate-900 border-b border-slate-200 pb-1">
           <Layers className="w-3.5 h-3.5 text-emerald-600" />
           <span>Inundation Water Depth</span>
@@ -269,8 +269,8 @@ function SimulationControls({
   material, setMaterial, failureMode, setFailureMode, running, onRunSimulation
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md text-slate-900 space-y-5">
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+    <div className="control-card space-y-5">
+      <div className="control-header">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 border border-emerald-200 flex items-center justify-center">
             <Sliders className="w-4 h-4 text-emerald-700" />
@@ -288,7 +288,7 @@ function SimulationControls({
             setMaterial('EARTHFILL');
             setFailureMode('OVERTOPPING');
           }}
-          className="text-xs font-bold text-slate-500 hover:text-emerald-700 flex items-center gap-1 transition-colors"
+          className="reset-btn"
         >
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Reset</span>
@@ -296,47 +296,47 @@ function SimulationControls({
       </div>
 
       <div className="space-y-4">
-        <div>
-          <div className="flex justify-between items-center text-xs font-bold mb-1">
-            <span className="text-slate-700">Dam Height</span>
-            <span className="text-emerald-800 font-extrabold bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">{damHeight} meters</span>
+        <div className="slider-group">
+          <div className="slider-header">
+            <span className="slider-label">Dam Height</span>
+            <span className="slider-value">{damHeight} meters</span>
           </div>
           <input
             type="range" min={10} max={150} step={1} value={damHeight}
             onChange={e => setDamHeight(Number(e.target.value))}
-            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+            className="range-slider"
           />
         </div>
 
-        <div>
-          <div className="flex justify-between items-center text-xs font-bold mb-1">
-            <span className="text-slate-700">Water Volume</span>
-            <span className="text-emerald-800 font-extrabold bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">{reservoirVol} Million m³</span>
+        <div className="slider-group">
+          <div className="slider-header">
+            <span className="slider-label">Water Volume</span>
+            <span className="slider-value">{reservoirVol} Million m³</span>
           </div>
           <input
             type="range" min={1} max={200} step={0.5} value={reservoirVol}
             onChange={e => setReservoirVol(Number(e.target.value))}
-            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+            className="range-slider"
           />
         </div>
 
-        <div>
-          <div className="flex justify-between items-center text-xs font-bold mb-1">
-            <span className="text-slate-700">Time for Dam to Break</span>
-            <span className="text-emerald-800 font-extrabold bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">
+        <div className="slider-group">
+          <div className="slider-header">
+            <span className="slider-label">Time for Dam to Break</span>
+            <span className="slider-value">
               {breachFormTime === 0 ? 'Auto Calculate' : `${breachFormTime.toFixed(1)} hours`}
             </span>
           </div>
           <input
             type="range" min={0} max={5} step={0.1} value={breachFormTime}
             onChange={e => setBreachFormTime(Number(e.target.value))}
-            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+            className="range-slider"
           />
         </div>
 
-        <div>
-          <label className="block text-xs font-extrabold text-slate-700 mb-1.5">Dam Type / Material</label>
-          <div className="grid grid-cols-3 gap-2">
+        <div className="option-group">
+          <label className="option-label">Dam Type / Material</label>
+          <div className="option-grid">
             {[
               { key: 'EARTHFILL', label: 'Mud / Earth' },
               { key: 'CONCRETE_GRAVITY', label: 'Concrete' },
@@ -344,9 +344,7 @@ function SimulationControls({
             ].map(item => (
               <button
                 key={item.key} onClick={() => setMaterial(item.key)}
-                className={`py-1.5 px-2 rounded-lg text-xs font-bold border text-center transition-all ${
-                  material === item.key ? 'bg-emerald-700 border-emerald-800 text-white shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
+                className={`option-btn ${material === item.key ? 'option-btn-active' : ''}`}
               >
                 {item.label}
               </button>
@@ -354,9 +352,9 @@ function SimulationControls({
           </div>
         </div>
 
-        <div>
-          <label className="block text-xs font-extrabold text-slate-700 mb-1.5">Cause of Dam Break</label>
-          <div className="grid grid-cols-3 gap-2">
+        <div className="option-group">
+          <label className="option-label">Cause of Dam Break</label>
+          <div className="option-grid">
             {[
               { key: 'OVERTOPPING', label: 'Water Overflow' },
               { key: 'PIPING', label: 'Internal Leak' },
@@ -364,9 +362,7 @@ function SimulationControls({
             ].map(item => (
               <button
                 key={item.key} onClick={() => setFailureMode(item.key)}
-                className={`py-1.5 px-2 rounded-lg text-xs font-bold border text-center transition-all ${
-                  failureMode === item.key ? 'bg-emerald-700 border-emerald-800 text-white shadow-sm' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
-                }`}
+                className={`option-btn ${failureMode === item.key ? 'option-btn-active' : ''}`}
               >
                 {item.label}
               </button>
@@ -377,15 +373,13 @@ function SimulationControls({
 
       <button
         onClick={onRunSimulation} disabled={running}
-        className={`w-full py-3.5 px-4 rounded-xl font-extrabold text-sm flex items-center justify-center gap-2 shadow-md transition-all ${
-          running ? 'bg-amber-500 text-slate-950 cursor-wait animate-pulse' : 'bg-emerald-700 hover:bg-emerald-600 text-white shadow-emerald-900/20'
-        }`}
+        className={`btn-primary ${running ? 'animate-pulse opacity-75 cursor-wait' : ''}`}
       >
         <Play className="w-4 h-4 fill-current" />
         <span>{running ? 'Calculating Water Spread...' : 'Start Flood Simulation'}</span>
       </button>
 
-      <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-start gap-2 text-xs text-slate-600">
+      <div className="info-box">
         <Info className="w-4 h-4 text-emerald-700 shrink-0 mt-0.5" />
         <p>Calculates how fast water flows downstream and checks village safety times.</p>
       </div>
@@ -400,41 +394,37 @@ function AnimationScrubber({ timelineStep, setTimelineStep, isPlaying, setIsPlay
   const formattedTime = `T+${hours.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:00`;
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-md text-slate-900 flex flex-col md:flex-row items-center gap-4">
+    <div className="scrubber-box">
       <button
         onClick={() => setIsPlaying(!isPlaying)}
-        className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 transition-all ${
-          isPlaying ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md' : 'bg-emerald-700 hover:bg-emerald-600 text-white shadow-md'
-        }`}
+        className="play-btn"
       >
         {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-0.5" />}
       </button>
 
-      <div className="flex-1 w-full space-y-1.5">
+      <div className="scrubber-info">
         <div className="flex justify-between items-center text-xs font-extrabold">
           <span className="flex items-center gap-1.5 text-slate-800">
             <Clock className="w-4 h-4 text-emerald-700" />
             <span>Flood Water Timeline</span>
           </span>
           <div className="flex items-center gap-3">
-            <span className="text-emerald-800 font-mono font-black bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200">{formattedTime}</span>
+            <span className="slider-value">{formattedTime}</span>
             <span className="text-slate-500">Frame {timelineStep} / {totalSteps}</span>
           </div>
         </div>
         <input
           type="range" min={0} max={totalSteps} step={1} value={timelineStep}
           onChange={e => setTimelineStep(Number(e.target.value))}
-          className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+          className="range-slider"
         />
       </div>
 
-      <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+      <div className="speed-selector">
         {[{ label: '1x', speed: 800 }, { label: '2x', speed: 400 }, { label: '4x', speed: 200 }].map(item => (
           <button
             key={item.label} onClick={() => setPlaybackSpeed(item.speed)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
-              playbackSpeed === item.speed ? 'bg-emerald-700 text-white shadow-sm' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-            }`}
+            className={`speed-btn ${playbackSpeed === item.speed ? 'speed-btn-active' : ''}`}
           >
             {item.label}
           </button>
@@ -451,8 +441,8 @@ function HydrographChart({ timeSeries, peakDischarge }) {
   })) : [];
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md text-slate-900 space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-200 pb-3">
+    <div className="chart-card space-y-4">
+      <div className="chart-header">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 border border-emerald-200 flex items-center justify-center">
             <Activity className="w-4 h-4 text-emerald-700" />
@@ -495,7 +485,7 @@ function HydrographChart({ timeSeries, peakDischarge }) {
 function HadrTable({ settlementImpacts }) {
   const impacts = settlementImpacts || [];
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md text-slate-900 space-y-4">
+    <div className="table-card space-y-4">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-amber-100 border border-amber-200 flex items-center justify-center">
@@ -506,14 +496,14 @@ function HadrTable({ settlementImpacts }) {
             <p className="text-xs text-slate-500">Flood water arrival times for nearby villages downstream</p>
           </div>
         </div>
-        <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200">
+        <span className="badge-safe">
           {impacts.length} Villages Checked
         </span>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs text-slate-700">
-          <thead className="bg-slate-50 text-slate-600 uppercase font-black text-[10px] tracking-wider border-b border-slate-200">
+        <table className="data-table">
+          <thead className="table-header">
             <tr>
               <th className="p-3">Village Name</th>
               <th className="p-3">Distance Downstream</th>
@@ -526,7 +516,7 @@ function HadrTable({ settlementImpacts }) {
           </thead>
           <tbody className="divide-y divide-slate-100 font-medium">
             {impacts.map((settlement, idx) => (
-              <tr key={idx} className="hover:bg-slate-50 transition-colors">
+              <tr key={idx} className="table-row">
                 <td className="p-3 font-extrabold text-slate-900 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600" />
                   <span>{settlement.name}</span>
@@ -546,9 +536,7 @@ function HadrTable({ settlementImpacts }) {
                   </div>
                 </td>
                 <td className="p-3">
-                  <span className={`px-2.5 py-1 rounded text-[10px] font-black uppercase border ${
-                    settlement.hazardLevel === 'EXTREME' || settlement.isFlooded ? 'bg-rose-50 text-rose-800 border-rose-200' : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  }`}>
+                  <span className={settlement.hazardLevel === 'EXTREME' || settlement.isFlooded ? 'badge-danger' : 'badge-safe'}>
                     {settlement.hazardLevel === 'EXTREME' || settlement.isFlooded ? 'HIGH DANGER' : 'LOW RISK'}
                   </span>
                 </td>
@@ -567,7 +555,7 @@ function HadrTable({ settlementImpacts }) {
 function SarValidationComponent({ validation }) {
   const v = validation || { iouScorePercent: 92.4, accuracyPercent: 95.8, satelliteSource: 'Sentinel-1 SAR', passDate: '2024-02-08', intersectionCount: 1845, falsePositiveCount: 112, falseNegativeCount: 48 };
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-md text-slate-900 space-y-5">
+    <div className="sar-card space-y-5">
       <div className="flex items-center justify-between border-b border-slate-200 pb-3">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-emerald-100 border border-emerald-200 flex items-center justify-center">
@@ -578,13 +566,13 @@ function SarValidationComponent({ validation }) {
             <p className="text-xs text-slate-500">Comparing simulation map with real Sentinel-1 satellite photo</p>
           </div>
         </div>
-        <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200">
+        <span className="badge-safe">
           Photo Date: {v.passDate || '2024-02-08'}
         </span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
+      <div className="sar-grid">
+        <div className="sar-stat-box space-y-1">
           <span className="text-xs text-slate-600 font-bold">Satellite Match Score</span>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-emerald-700">{v.iouScorePercent ? v.iouScorePercent.toFixed(1) : (v.iouScore * 100).toFixed(1)}%</span>
@@ -593,7 +581,7 @@ function SarValidationComponent({ validation }) {
           <p className="text-[11px] text-slate-500">Computer prediction vs real satellite image</p>
         </div>
 
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
+        <div className="sar-stat-box space-y-1">
           <span className="text-xs text-slate-600 font-bold">Overall Accuracy</span>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-black text-sky-700">95.8%</span>
@@ -602,7 +590,7 @@ function SarValidationComponent({ validation }) {
           <p className="text-[11px] text-slate-500">Pixel area comparison accuracy</p>
         </div>
 
-        <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1">
+        <div className="sar-stat-box space-y-1">
           <span className="text-xs text-slate-600 font-bold">Satellite Source</span>
           <div className="flex items-baseline gap-2">
             <span className="text-lg font-black text-slate-900">{v.satelliteSource}</span>
@@ -617,9 +605,9 @@ function SarValidationComponent({ validation }) {
 function ReportModal({ isOpen, onClose, site, run }) {
   if (!isOpen) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-      <div className="bg-white border border-slate-200 w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden text-slate-900 flex flex-col max-h-[90vh]">
-        <div className="bg-emerald-900 px-6 py-4 flex items-center justify-between text-white">
+    <div className="modal-backdrop">
+      <div className="modal-box">
+        <div className="modal-header">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-lg bg-emerald-700 flex items-center justify-center">
               <Shield className="w-5 h-5 text-white" />
@@ -634,7 +622,7 @@ function ReportModal({ isOpen, onClose, site, run }) {
           </button>
         </div>
 
-        <div className="p-6 overflow-y-auto space-y-6 text-xs text-slate-700 print:text-black print:bg-white print:p-0">
+        <div className="modal-body space-y-6 print:text-black print:bg-white print:p-0">
           <div className="border-b border-slate-200 pb-4 flex justify-between items-start">
             <div>
               <span className="font-extrabold text-slate-900 text-base block">{site ? site.name : 'Rishi Ganga Hydro System'}</span>
@@ -668,11 +656,11 @@ function ReportModal({ isOpen, onClose, site, run }) {
           )}
         </div>
 
-        <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-end gap-3">
+        <div className="modal-footer">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-200 hover:bg-slate-300 transition-colors">
             Close
           </button>
-          <button onClick={() => window.print()} className="px-4 py-2 rounded-xl text-xs font-extrabold text-white bg-emerald-700 hover:bg-emerald-600 flex items-center gap-2 shadow-md transition-all">
+          <button onClick={() => window.print()} className="btn-accent">
             <Printer className="w-4 h-4" />
             <span>Print Report PDF</span>
           </button>
@@ -744,6 +732,7 @@ export default function App() {
       });
       setCurrentRun(result);
       setTimelineStep(0);
+      setIsPlaying(true);
     } catch (err) {
       console.error('Simulation execution failed', err);
     } finally {
@@ -752,25 +741,27 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans flex flex-col selection:bg-emerald-600 selection:text-white">
+    <div className="page-wrapper font-sans selection:bg-emerald-600 selection:text-white">
       <Header
         activeTab={activeTab} setActiveTab={setActiveTab}
-        onOpenReport={() => setShowReportModal(true)} isRunning={running}
+        onOpenReport={() => setShowReportModal(true)}
+        onStartSimulation={() => executeSimulation()}
+        isRunning={running}
       />
 
-      <main className="flex-1 pb-16 bg-slate-50">
+      <main className="main-content">
         {activeTab === 'home' && (
-          <div className="space-y-8 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="bg-gradient-to-br from-emerald-800 via-emerald-900 to-slate-900 border border-emerald-700 rounded-3xl p-8 sm:p-10 shadow-xl relative overflow-hidden text-white">
+          <div className="content-container space-y-8">
+            <div className="hero-card">
               <div className="relative z-10 max-w-3xl space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-300 text-xs font-bold uppercase tracking-wider">
+                <div className="hero-badge">
                   <Shield className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Easy Dam Flood Simulator</span>
                 </div>
-                <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-white leading-tight">Dam Break & Flood Water Simulator</h1>
-                <p className="text-base text-emerald-100 font-medium leading-relaxed">Predict how flood water spreads when a dam breaks, check village evacuation times, and verify flood maps with satellite photos.</p>
+                <h1 className="hero-heading">Dam Break & Flood Water Simulator</h1>
+                <p className="hero-subtitle">Predict how flood water spreads when a dam breaks, check village evacuation times, and verify flood maps with satellite photos.</p>
                 <div className="flex items-center gap-4 pt-2">
-                  <button onClick={() => setActiveTab('studio')} className="px-6 py-3.5 rounded-xl font-extrabold text-sm text-slate-950 bg-emerald-400 hover:bg-emerald-300 flex items-center gap-2 shadow-lg transition-all transform hover:-translate-y-0.5">
+                  <button onClick={() => setActiveTab('studio')} className="hero-btn">
                     <span>Open Flood Simulator</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
@@ -779,41 +770,41 @@ export default function App() {
             </div>
 
             {currentRun && (
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-1">
-                  <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+              <div className="metrics-grid">
+                <div className="card">
+                  <div className="card-title">
                     <span>Max Water Flow</span>
                     <Activity className="w-4 h-4 text-emerald-600" />
                   </div>
-                  <p className="text-2xl font-black text-emerald-700 font-mono">{currentRun.peakDischargeCumecs ? currentRun.peakDischargeCumecs.toLocaleString() : 0} m³/s</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Peak water coming out of dam</p>
+                  <p className="card-value">{currentRun.peakDischargeCumecs ? currentRun.peakDischargeCumecs.toLocaleString() : 0} m³/s</p>
+                  <p className="card-subtext">Peak water coming out of dam</p>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-1">
-                  <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+                <div className="card">
+                  <div className="card-title">
                     <span>Satellite Match</span>
                     <CheckCircle2 className="w-4 h-4 text-sky-600" />
                   </div>
-                  <p className="text-2xl font-black text-sky-700 font-mono">92.4% Match</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Sentinel-1 satellite verification</p>
+                  <p className="card-value">92.4% Match</p>
+                  <p className="card-subtext">Sentinel-1 satellite verification</p>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-1">
-                  <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+                <div className="card">
+                  <div className="card-title">
                     <span>Evacuation Time</span>
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
                   </div>
-                  <p className="text-2xl font-black text-amber-700 font-mono">0.3 hours</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Time to reach nearest village</p>
+                  <p className="card-value">0.3 hours</p>
+                  <p className="card-subtext">Time to reach nearest village</p>
                 </div>
 
-                <div className="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-1">
-                  <div className="flex items-center justify-between text-slate-500 text-xs font-bold">
+                <div className="card">
+                  <div className="card-title">
                     <span>People at Risk</span>
                     <Shield className="w-4 h-4 text-rose-600" />
                   </div>
-                  <p className="text-2xl font-black text-rose-700 font-mono">{currentRun.damageAssessment ? currentRun.damageAssessment.totalPopulationAffected.toLocaleString() : 0} people</p>
-                  <p className="text-[11px] text-slate-500 font-medium">Monitored in safety zone</p>
+                  <p className="card-value">{currentRun.damageAssessment ? currentRun.damageAssessment.totalPopulationAffected.toLocaleString() : 0} people</p>
+                  <p className="card-subtext">Monitored in safety zone</p>
                 </div>
               </div>
             )}
@@ -821,7 +812,7 @@ export default function App() {
         )}
 
         {activeTab === 'studio' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          <div className="content-container space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-4 space-y-6">
                 <SimulationControls
@@ -856,19 +847,19 @@ export default function App() {
         )}
 
         {activeTab === 'satellite' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="content-container">
             <SarValidationComponent validation={currentRun?.validation} />
           </div>
         )}
 
         {activeTab === 'hadr' && (
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="content-container">
             <HadrTable settlementImpacts={currentRun?.damageAssessment?.settlements} />
           </div>
         )}
       </main>
 
-      <footer className="border-t border-slate-200 bg-white py-6 text-center text-xs text-slate-500 font-medium">
+      <footer className="footer-bar">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p>&copy; {new Date().getFullYear()} DAM FLOOD SHIELD &bull; Hydrodynamic Inundation Simulator</p>
           <div className="flex items-center gap-4 text-slate-500">

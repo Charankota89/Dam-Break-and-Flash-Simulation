@@ -16,7 +16,7 @@ A simple web application to simulate dam breach flood water spread, check villag
 
 ## Project Architecture
 
-* **Frontend**: React, TypeScript, MapLibre GL, Tailwind CSS
+* **Frontend**: React, Pure JavaScript, MapLibre GL, Tailwind CSS
 * **Backend**: Node.js, Express.js
 * **Cloud Services**: AWS SNS (Emergency SMS Alerts), AWS S3 (Disaster Report Backup)
 
